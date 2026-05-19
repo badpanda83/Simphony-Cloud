@@ -2,6 +2,11 @@ import { assertSimphonyHost } from "../config.js";
 import { ensureIdToken } from "./auth.js";
 import type { SimphonyContext, SimphonyRequestOptions } from "../types.js";
 
+export interface SimphonySession {
+  host: string;
+  idToken: string;
+}
+
 function buildQuery(
   query?: Record<string, string | number | boolean | undefined>
 ): string {
@@ -40,11 +45,26 @@ export function resolveContext(
   };
 }
 
+export async function simphonyRequestWithSession<T = unknown>(
+  session: SimphonySession,
+  options: SimphonyRequestOptions
+): Promise<{ status: number; data: T; headers: Headers }> {
+  return executeSimphonyRequest(session.host, session.idToken, options);
+}
+
 export async function simphonyRequest<T = unknown>(
   options: SimphonyRequestOptions
 ): Promise<{ status: number; data: T; headers: Headers }> {
   const host = assertSimphonyHost();
   const idToken = await ensureIdToken();
+  return executeSimphonyRequest(host, idToken, options);
+}
+
+async function executeSimphonyRequest<T>(
+  host: string,
+  idToken: string,
+  options: SimphonyRequestOptions
+): Promise<{ status: number; data: T; headers: Headers }> {
   const queryString = buildQuery(options.query);
   const url = `${host}${options.path}${queryString}`;
 
@@ -106,3 +126,4 @@ export async function simphonyRequest<T = unknown>(
 
   return { status: res.status, data, headers: res.headers };
 }
+

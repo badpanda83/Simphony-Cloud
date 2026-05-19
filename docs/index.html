@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simphony Cloud — Connection Test</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <h1>Simphony Cloud</h1>
+        <p class="lead">
+          Enter your STS Gen2 credentials. We authenticate, then verify revenue
+          centers, tables, categories, and tickets (checks in the last 7 days).
+        </p>
+      </header>
+
+      <form id="setup-form" class="card">
+        <h2>API connection</h2>
+        <label>
+          Integration API URL
+          <input
+            type="url"
+            id="apiBaseUrl"
+            name="apiBaseUrl"
+            placeholder="https://your-app.up.railway.app"
+            required
+          />
+          <span class="hint"
+            >Your Railway (or local) deployment — not the Simphony host</span
+          >
+        </label>
+
+        <h2>Simphony host &amp; account</h2>
+        <label>
+          Simphony host
+          <input
+            type="url"
+            id="simphonyHost"
+            name="simphonyHost"
+            placeholder="https://your-tenant.example.com"
+            required
+          />
+        </label>
+        <label>
+          Client ID
+          <input type="text" id="clientId" name="clientId" required />
+        </label>
+        <label>
+          API username
+          <input type="text" id="username" name="username" autocomplete="username" required />
+        </label>
+        <label>
+          API password
+          <input
+            type="password"
+            id="password"
+            name="password"
+            autocomplete="current-password"
+            required
+          />
+        </label>
+        <label>
+          Organization name (sign-in)
+          <input type="text" id="orgName" name="orgName" required />
+        </label>
+
+        <h2>Location</h2>
+        <div class="row">
+          <label>
+            Org short name
+            <input type="text" id="orgShortName" name="orgShortName" required />
+          </label>
+          <label>
+            Location ref
+            <input type="text" id="locRef" name="locRef" required />
+          </label>
+          <label>
+            Revenue center ref
+            <input type="text" id="rvcRef" name="rvcRef" required />
+          </label>
+        </div>
+        <label>
+          Menu ID <span class="optional">(optional)</span>
+          <input type="text" id="menuId" name="menuId" placeholder="Uses first menu if empty" />
+        </label>
+
+        <button type="submit" id="submit-btn">Run validation</button>
+      </form>
+
+      <section id="status" class="card hidden" aria-live="polite"></section>
+      <section id="results" class="hidden"></section>
+
+      <footer>
+        <a href="https://github.com/badpanda83/Simphony-Cloud">GitHub</a>
+        ·
+        <a
+          href="https://docs.oracle.com/en/industries/food-beverage/simphony/omsstsg2api/index.html"
+          >Oracle STS Gen2 docs</a
+        >
+      </footer>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

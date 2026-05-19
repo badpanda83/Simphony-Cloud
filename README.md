@@ -72,6 +72,37 @@ Content-Type: application/json
 
 **Production (Railway):** set `PUBLIC_BASE_URL`, deploy, then run the same setup without `callbackUri` (uses `{PUBLIC_BASE_URL}/webhooks/simphony`). Keep `WEBHOOK_FORWARD_URL` to mirror to webhook.site while testing.
 
+## Setup wizard (GitHub Pages)
+
+A credential form on GitHub Pages calls your Railway API to authenticate and validate Simphony connectivity.
+
+### Enable GitHub Pages
+
+1. Repo **Settings → Pages**
+2. **Build and deployment** → Source: **Deploy from a branch**
+3. Branch: `main`, folder: **`/docs`**
+4. Save — site URL: `https://badpanda83.github.io/Simphony-Cloud/`
+
+### Run validation
+
+1. Deploy this service to Railway and copy the public URL.
+2. Open the GitHub Pages site (or `http://localhost:3000/setup` locally).
+3. Enter **Integration API URL** = your Railway URL.
+4. Fill in Simphony host, API account, and location (`orgShortName`, `locRef`, `rvcRef`).
+5. Click **Run validation**.
+
+The API runs `POST /workflows/setup/validate`, which:
+
+| Step | Simphony source |
+|------|-----------------|
+| Authentication | OIDC PKCE → `id_token` |
+| Revenue centers | `GET .../revenueCenters` |
+| Tables | `GET .../revenueCenters/{rvcRef}` → `tables[]` |
+| Categories | `GET /api/v2/menus/{menuId}` → `familyGroups[]` |
+| **Tickets** | `GET /api/v1/checks?sinceTime=7d&includeClosed=true` — **must find ≥1 check in last 7 days** |
+
+Overall pass requires all data steps plus the tickets rule.
+
 ## Railway deploy
 
 1. Push this repo to `badpanda83/Simphony-Cloud`

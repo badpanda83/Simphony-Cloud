@@ -9,7 +9,7 @@ type CookieJar = Map<string, string>;
 
 const authSessions = new Map<
   string,
-  { jar: CookieJar; codeVerifier: string; createdAt: number }
+  { jar: CookieJar; codeVerifier: string; createdAt: number; host: string }
 >();
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
@@ -35,10 +35,10 @@ function storeCookies(jar: CookieJar, setCookieHeaders: string[]): void {
 }
 
 async function oidcFetch(
+  host: string,
   path: string,
   init: RequestInit & { jar: CookieJar }
 ): Promise<Response> {
-  const host = assertSimphonyHost();
   const headers = new Headers(init.headers);
   const cookie = buildCookieHeader(init.jar);
   if (cookie) headers.set("Cookie", cookie);
@@ -74,10 +74,12 @@ export interface AuthorizeStartResult {
 }
 
 /** Start OIDC authorize and return session id for sign-in. */
-export async function startAuthorization(): Promise<AuthorizeStartResult> {
+export async function startAuthorization(
+  overrides?: { host?: string; clientId?: string }
+): Promise<AuthorizeStartResult> {
   purgeSessions();
-  const host = assertSimphonyHost();
-  const clientId = config.simphony.clientId;
+  const host = overrides?.host ?? assertSimphonyHost();
+  const clientId = overrides?.clientId ?? config.simphony.clientId;
   if (!clientId) {
     throw new Error("SIMPHONY_CLIENT_ID is required for authorization");
   }
@@ -95,7 +97,7 @@ export async function startAuthorization(): Promise<AuthorizeStartResult> {
     code_challenge_method: "S256",
   });
 
-  const res = await oidcFetch(`/oidc-provider/v1/oauth2/authorize?${params}`, {
+  const res = await oidcFetch(host, `/oidc-provider/v1/oauth2/authorize?${params}`, {
     method: "GET",
     jar,
   });
@@ -109,6 +111,7 @@ export async function startAuthorization(): Promise<AuthorizeStartResult> {
     jar,
     codeVerifier,
     createdAt: Date.now(),
+    host,
   });
 
   return {
@@ -143,7 +146,8 @@ export async function signIn(input: SignInInput): Promise<{ authCode: string }> 
     orgname: input.orgname,
   });
 
-  const res = await oidcFetch("/oidc-provider/v1/oauth2/signin", {
+  const host = session.host ?? assertSimphonyHost();
+  const res = await oidcFetch(host, "/oidc-provider/v1/oauth2/signin", {
     method: "POST",
     jar: session.jar,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -179,10 +183,17 @@ export function getCodeVerifier(authSessionId: string): string {
 
 export async function exchangeToken(
   grantType: "authorization_code" | "refresh_token",
-  params: { code?: string; codeVerifier?: string; refreshToken?: string }
+  params: {
+    code?: string;
+    codeVerifier?: string;
+    refreshToken?: string;
+    host?: string;
+    clientId?: string;
+    persist?: boolean;
+  }
 ): Promise<TokenSet> {
-  const host = assertSimphonyHost();
-  const clientId = config.simphony.clientId;
+  const host = params.host ?? assertSimphonyHost();
+  const clientId = params.clientId ?? config.simphony.clientId;
   if (!clientId) throw new Error("SIMPHONY_CLIENT_ID is required");
 
   const body = new URLSearchParams({
@@ -228,7 +239,9 @@ export async function exchangeToken(
     expiresAt: Date.now() + expiresIn * 1000,
   };
 
-  setTokens(tokens);
+  if (params.persist !== false) {
+    setTokens(tokens);
+  }
   return tokens;
 }
 
@@ -253,15 +266,47 @@ export async function ensureIdToken(): Promise<string> {
 
 /** Convenience: full auth using env credentials (for Postman / automation). */
 export async function authenticateFromEnv(): Promise<TokenSet> {
-  const started = await startAuthorization();
+  const host = assertSimphonyHost();
+  const clientId = config.simphony.clientId!;
+  return authenticateWithCredentials(
+    {
+      host,
+      clientId,
+      username: config.simphony.apiUsername!,
+      password: config.simphony.apiPassword!,
+      orgName: config.simphony.orgName!,
+    },
+    { persist: true }
+  );
+}
+
+/** Full PKCE auth with explicit credentials (setup wizard / validate). */
+export async function authenticateWithCredentials(
+  creds: {
+    host: string;
+    clientId: string;
+    username: string;
+    password: string;
+    orgName: string;
+  },
+  options?: { persist?: boolean }
+): Promise<TokenSet> {
+  const host = creds.host.replace(/\/$/, "");
+  const started = await startAuthorization({
+    host,
+    clientId: creds.clientId,
+  });
   const { authCode } = await signIn({
     authSessionId: started.authSessionId,
-    username: config.simphony.apiUsername!,
-    password: config.simphony.apiPassword!,
-    orgname: config.simphony.orgName!,
+    username: creds.username,
+    password: creds.password,
+    orgname: creds.orgName,
   });
   return exchangeToken("authorization_code", {
     code: authCode,
     codeVerifier: started.codeVerifier,
+    host,
+    clientId: creds.clientId,
+    persist: options?.persist ?? false,
   });
 }
