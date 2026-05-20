@@ -21,6 +21,24 @@ export declare const config: {
         forwardUrl: string;
     };
     publicBaseUrl: string | undefined;
+    passwordResetApproval: {
+        enabled: boolean;
+        executionEnabled: boolean;
+        defaultApprovalChannel: "email" | "slack";
+        approvalEmailTo: string | undefined;
+        mailboxProvider: "gmail";
+        gmail: {
+            inboxAddress: string | undefined;
+            label: string;
+            pollIntervalMs: number;
+        };
+        slack: {
+            botToken: string | undefined;
+            channelId: string | undefined;
+        };
+        approvalTokenSecret: string | undefined;
+        approvalTokenTtlSeconds: number;
+    };
 };
 export declare function assertSimphonyHost(): string;
 //# sourceMappingURL=config.d.ts.map

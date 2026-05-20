@@ -14,6 +14,7 @@ Designed for deployment on [Railway](https://railway.com) (GitHub-connected) wit
 - **Webhooks**: `POST /webhooks/simphony` — HMAC verification + optional forward
 - **Notifications**: `POST /workflows/notifications/setup` registers HMAC + subscriptions
 - **Generic read proxy**: `GET /proxy/api/v1/...`
+- **Password reset approval scaffolding**: email-first approvals with Slack-ready provider interface
 
 ## Quick start
 
@@ -38,12 +39,23 @@ See [.env.example](.env.example). Required for live Simphony calls:
 | `SIMPHONY_ORG_SHORT_NAME`, `SIMPHONY_LOC_REF`, `SIMPHONY_RVC_REF` | Default location context |
 | `WEBHOOK_FORWARD_URL` | Dev mirror (default: your webhook.site URL) |
 | `PUBLIC_BASE_URL` | Railway URL for notification callbacks |
+| `PASSWORD_RESET_APPROVAL_*` | Password reset approval workflow scaffolding flags/secrets |
 
 ### Authentication
 
 **Fastest (Postman):** set `SIMPHONY_ID_TOKEN` and `SIMPHONY_REFRESH_TOKEN`, or call `POST /auth/login` after setting username/password in `.env`.
 
 **Manual PKCE:** `GET /auth/authorize` → `POST /auth/signin` → `POST /auth/token`
+
+### Password reset approval scaffolding (email first)
+
+Design/runtime details: [docs/password-reset-approval-architecture.md](docs/password-reset-approval-architecture.md)
+
+- Enable with `PASSWORD_RESET_APPROVAL_ENABLED=true`
+- Keep destructive execution disabled unless intentionally implementing it (`PASSWORD_RESET_EXECUTION_ENABLED=false` by default)
+- Inbound endpoint (protected by API key middleware): `POST /workflows/password-reset/inbound`
+- Approval endpoints: `GET /workflows/password-reset/approve?token=...` and `GET /workflows/password-reset/deny?token=...`
+- Status endpoint: `GET /workflows/password-reset/status/:requestId`
 
 ### Check workflow
 
