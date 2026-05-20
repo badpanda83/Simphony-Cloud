@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import { config, assertSimphonyHost } from "../config.js";
 import { generatePkce } from "./pkce.js";
@@ -26,26 +25,54 @@ function storeCookies(jar, setCookieHeaders) {
     }
 }
 async function oidcFetch(host, path, init) {
-    const headers = new Headers(init.headers);
-    const cookie = buildCookieHeader(init.jar);
-    if (cookie)
-        headers.set("Cookie", cookie);
-    const res = await fetch(`${host}${path}`, { ...init, headers });
-    const setCookies = typeof res.headers.getSetCookie === "function"
-        ? res.headers.getSetCookie()
-        : res.headers.get("set-cookie")
-            ? [res.headers.get("set-cookie")]
-            : [];
-    storeCookies(init.jar, setCookies);
-    return res;
-}
-function codeChallengeFromVerifier(codeVerifier) {
-    return createHash("sha256")
-        .update(codeVerifier, "ascii")
-        .digest("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
+    const MAX_REDIRECTS = 10;
+    let url = `${host}${path}`;
+    let method = init.method ?? "GET";
+    let body = init.body;
+    for (let attempt = 0; attempt <= MAX_REDIRECTS; attempt++) {
+        const headers = new Headers(init.headers);
+        // Remove Content-Type for GET requests (e.g. after a POST→redirect→GET)
+        if (method === "GET")
+            headers.delete("Content-Type");
+        const cookie = buildCookieHeader(init.jar);
+        if (cookie)
+            headers.set("Cookie", cookie);
+        const res = await fetch(url, {
+            method,
+            headers,
+            body: body ?? null,
+            redirect: "manual",
+        });
+        // Capture cookies from every response, including intermediate redirects
+        const setCookies = typeof res.headers.getSetCookie === "function"
+            ? res.headers.getSetCookie()
+            : res.headers.get("set-cookie")
+                ? [res.headers.get("set-cookie")]
+                : [];
+        storeCookies(init.jar, setCookies);
+        if (res.status >= 300 && res.status < 400) {
+            const location = res.headers.get("location");
+            if (!location)
+                return res;
+            if (location.startsWith("https://") || location.startsWith("http://")) {
+                url = location;
+            }
+            else if (location.startsWith("/")) {
+                url = `${new URL(url).origin}${location}`;
+            }
+            else {
+                // Non-HTTP scheme (e.g. apiaccount://) – stop following
+                return res;
+            }
+            if (res.status === 302 || res.status === 303) {
+                method = "GET";
+                body = undefined;
+            }
+            continue;
+        }
+        return res;
+    }
+    throw new Error("oidcFetch: too many redirects");
 }
 /** Start OIDC authorize and return session id for sign-in. */
 export async function startAuthorization(overrides) {
@@ -66,14 +93,17 @@ export async function startAuthorization(overrides) {
         code_challenge: codeChallenge,
         code_challenge_method: "S256",
     });
+    console.debug("[auth] authorize → GET %s/oidc-provider/v1/oauth2/authorize", host);
     const res = await oidcFetch(host, `/oidc-provider/v1/oauth2/authorize?${params}`, {
         method: "GET",
         jar,
     });
     if (!res.ok) {
         const err = await res.text();
+        console.error("[auth] authorize failed (%d): %s", res.status, err);
         throw new Error(`Authorize failed (${res.status}): ${err}`);
     }
+    console.debug("[auth] authorize OK (%d), cookies captured: %d", res.status, jar.size);
     authSessions.set(authSessionId, {
         jar,
         codeVerifier,
@@ -103,6 +133,7 @@ export async function signIn(input) {
         orgname: input.orgname,
     });
     const host = session.host ?? assertSimphonyHost();
+    console.debug("[auth] signin → POST %s/oidc-provider/v1/oauth2/signin", host);
     const res = await oidcFetch(host, "/oidc-provider/v1/oauth2/signin", {
         method: "POST",
         jar: session.jar,
@@ -111,6 +142,7 @@ export async function signIn(input) {
     });
     const json = (await res.json());
     if (!res.ok || !json.success || !json.redirectUrl) {
+        console.error("[auth] signin failed (%d): %s", res.status, json.message);
         throw new Error(json.message ?? `Sign-in failed (${res.status})`);
     }
     const match = json.redirectUrl.match(/[?&]code=([^&]+)/);
@@ -118,6 +150,7 @@ export async function signIn(input) {
     if (!authCode) {
         throw new Error("No authorization code in sign-in response");
     }
+    console.debug("[auth] signin OK – authorization code received");
     return { authCode };
 }
 export function getCodeVerifier(authSessionId) {
@@ -126,6 +159,10 @@ export function getCodeVerifier(authSessionId) {
         throw new Error("Invalid or expired authSessionId");
     }
     return session.codeVerifier;
+}
+/** Return the cookie jar for an active auth session (for token exchange). */
+export function getSessionJar(authSessionId) {
+    return authSessions.get(authSessionId)?.jar;
 }
 export async function exchangeToken(grantType, params) {
     const host = params.host ?? assertSimphonyHost();
@@ -151,15 +188,22 @@ export async function exchangeToken(grantType, params) {
             throw new Error("No refresh token available");
         body.set("refresh_token", refresh);
     }
-    const res = await fetch(`${host}/oidc-provider/v1/oauth2/token`, {
+    // Use the session cookie jar so Oracle's STS receives the same session cookies
+    // that were established during the authorize and sign-in steps.
+    const jar = params.jar ?? new Map();
+    console.debug("[auth] token exchange → POST %s/oidc-provider/v1/oauth2/token (grant=%s)", host, grantType);
+    const res = await oidcFetch(host, "/oidc-provider/v1/oauth2/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: body.toString(),
+        jar,
     });
     const json = (await res.json());
     if (!res.ok || !json.id_token || !json.refresh_token) {
+        console.error("[auth] token exchange failed (%d): %s", res.status, json.message);
         throw new Error(json.message ?? `Token exchange failed (${res.status})`);
     }
+    console.debug("[auth] token exchange OK – id_token and refresh_token received");
     const expiresIn = Number(json.expires_in ?? 1209600);
     const tokens = {
         idToken: json.id_token,
@@ -210,12 +254,16 @@ export async function authenticateWithCredentials(creds, options) {
         password: creds.password,
         orgname: creds.orgName,
     });
+    // Pass the session jar so Oracle's token endpoint receives the same cookies
+    // that were established during authorize and sign-in (mirrors the Postman flow).
+    const session = authSessions.get(started.authSessionId);
     return exchangeToken("authorization_code", {
         code: authCode,
         codeVerifier: started.codeVerifier,
         host,
         clientId: creds.clientId,
         persist: options?.persist ?? false,
+        jar: session?.jar,
     });
 }
 //# sourceMappingURL=auth.js.map
