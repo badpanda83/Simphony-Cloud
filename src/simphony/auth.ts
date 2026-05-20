@@ -40,21 +40,20 @@ async function oidcFetch(
 ): Promise<Response> {
   const MAX_REDIRECTS = 10;
   let url = `${host}${path}`;
-  let method: string = init.method ?? "GET";
+
+  // Enforce HTTPS to prevent unintended access to non-TLS or internal endpoints.
+  if (!url.startsWith("https://")) {
+    throw new Error(`oidcFetch: only HTTPS endpoints are supported (received: ${host})`);
+  }
+
+  let method = (init.method ?? "GET") as string;
   let body: BodyInit | null | undefined = init.body;
 
   // Compute the trusted origin from the initial URL; only follow redirects within it.
-  let initialOrigin: string;
-  try {
-    initialOrigin = new URL(url).origin;
-  } catch {
-    initialOrigin = host;
-  }
+  const initialOrigin = new URL(url).origin;
 
   for (let attempt = 0; attempt < MAX_REDIRECTS; attempt++) {
     const headers = new Headers(init.headers);
-    // Remove Content-Type for GET requests (e.g. after a POST→redirect→GET)
-    if (method === "GET") headers.delete("Content-Type");
     const cookie = buildCookieHeader(init.jar);
     if (cookie) headers.set("Cookie", cookie);
 
@@ -91,6 +90,7 @@ async function oidcFetch(
         // Non-HTTP scheme (e.g. apiaccount://) – stop following
         return res;
       }
+      // For 302/303, switch to GET and drop request body/Content-Type
       if (res.status === 302 || res.status === 303) {
         method = "GET";
         body = undefined;
@@ -136,7 +136,7 @@ export async function startAuthorization(
     code_challenge_method: "S256",
   });
 
-  console.debug("[auth] authorize → GET %s/oidc-provider/v1/oauth2/authorize", host);
+  console.debug("[auth] authorize -> GET %s/oidc-provider/v1/oauth2/authorize", host);
   const res = await oidcFetch(host, `/oidc-provider/v1/oauth2/authorize?${params}`, {
     method: "GET",
     jar,
@@ -189,7 +189,7 @@ export async function signIn(input: SignInInput): Promise<{ authCode: string }> 
   });
 
   const host = session.host ?? assertSimphonyHost();
-  console.debug("[auth] signin → POST %s/oidc-provider/v1/oauth2/signin", host);
+  console.debug("[auth] signin -> POST %s/oidc-provider/v1/oauth2/signin", host);
   const res = await oidcFetch(host, "/oidc-provider/v1/oauth2/signin", {
     method: "POST",
     jar: session.jar,
@@ -267,10 +267,11 @@ export async function exchangeToken(
     body.set("refresh_token", refresh);
   }
 
-  // Use the session cookie jar so Oracle's STS receives the same session cookies
-  // that were established during the authorize and sign-in steps.
+  // For authorization_code grants, pass the session jar so Oracle's STS receives
+  // the same cookies established during authorize and sign-in (mirrors Postman flow).
+  // For refresh_token grants, a fresh empty jar is acceptable.
   const tokenJar: CookieJar = params.jar ?? new Map();
-  console.debug("[auth] token exchange → POST %s/oidc-provider/v1/oauth2/token (grant=%s)", host, grantType);
+  console.debug("[auth] token exchange -> POST %s/oidc-provider/v1/oauth2/token (grant=%s)", host, grantType);
   const res = await oidcFetch(host, "/oidc-provider/v1/oauth2/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -355,6 +356,9 @@ export async function authenticateWithCredentials(
     host,
     clientId: creds.clientId,
   });
+  // Capture the session jar before signIn (which calls purgeSessions internally)
+  // to guarantee the reference is obtained while the session is known to exist.
+  const sessionJar = authSessions.get(started.authSessionId)?.jar;
   const { authCode } = await signIn({
     authSessionId: started.authSessionId,
     username: creds.username,
@@ -363,13 +367,12 @@ export async function authenticateWithCredentials(
   });
   // Pass the session jar so Oracle's token endpoint receives the same cookies
   // that were established during authorize and sign-in (mirrors the Postman flow).
-  const session = authSessions.get(started.authSessionId);
   return exchangeToken("authorization_code", {
     code: authCode,
     codeVerifier: started.codeVerifier,
     host,
     clientId: creds.clientId,
     persist: options?.persist ?? false,
-    jar: session?.jar,
+    jar: sessionJar,
   });
 }
