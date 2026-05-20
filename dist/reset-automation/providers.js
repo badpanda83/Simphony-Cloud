@@ -6,7 +6,7 @@ export class EmailApprovalProvider {
         if (!recipient) {
             throw new Error("PASSWORD_RESET_APPROVAL_EMAIL_TO is required for email approvals");
         }
-        console.info("[password-reset] email approval scaffold: to=%s requestId=%s approveUrl=%s denyUrl=%s", recipient, payload.request.id, payload.approveUrl, payload.denyUrl);
+        console.info("[password-reset] email approval scaffold queued: requestId=%s channel=%s", payload.request.id, this.channel);
     }
 }
 export class SlackApprovalProvider {
@@ -16,13 +16,13 @@ export class SlackApprovalProvider {
         if (!channelId) {
             throw new Error("PASSWORD_RESET_SLACK_CHANNEL_ID is required for Slack approvals");
         }
-        console.info("[password-reset] slack approval scaffold: channel=%s requestId=%s", channelId, payload.request.id);
+        console.info("[password-reset] slack approval scaffold queued: requestId=%s channel=%s", payload.request.id, this.channel);
     }
 }
 export class GmailInboundResetProvider {
     source = "gmail";
     async start() {
-        console.info("[password-reset] gmail inbound provider scaffold active: inbox=%s label=%s pollIntervalMs=%d", config.passwordResetApproval.gmail.inboxAddress ?? "unset", config.passwordResetApproval.gmail.label, config.passwordResetApproval.gmail.pollIntervalMs);
+        console.info("[password-reset] gmail inbound provider scaffold active (provider=%s)", this.source);
     }
     async stop() {
         console.info("[password-reset] gmail inbound provider scaffold stopped");

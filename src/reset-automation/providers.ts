@@ -16,11 +16,9 @@ export class EmailApprovalProvider implements ApprovalProvider {
       throw new Error("PASSWORD_RESET_APPROVAL_EMAIL_TO is required for email approvals");
     }
     console.info(
-      "[password-reset] email approval scaffold: to=%s requestId=%s approveUrl=%s denyUrl=%s",
-      recipient,
+      "[password-reset] email approval scaffold queued: requestId=%s channel=%s",
       payload.request.id,
-      payload.approveUrl,
-      payload.denyUrl
+      this.channel
     );
   }
 }
@@ -34,9 +32,9 @@ export class SlackApprovalProvider implements ApprovalProvider {
       throw new Error("PASSWORD_RESET_SLACK_CHANNEL_ID is required for Slack approvals");
     }
     console.info(
-      "[password-reset] slack approval scaffold: channel=%s requestId=%s",
-      channelId,
-      payload.request.id
+      "[password-reset] slack approval scaffold queued: requestId=%s channel=%s",
+      payload.request.id,
+      this.channel
     );
   }
 }
@@ -46,10 +44,8 @@ export class GmailInboundResetProvider implements InboundResetProvider {
 
   async start(): Promise<void> {
     console.info(
-      "[password-reset] gmail inbound provider scaffold active: inbox=%s label=%s pollIntervalMs=%d",
-      config.passwordResetApproval.gmail.inboxAddress ?? "unset",
-      config.passwordResetApproval.gmail.label,
-      config.passwordResetApproval.gmail.pollIntervalMs
+      "[password-reset] gmail inbound provider scaffold active (provider=%s)",
+      this.source
     );
   }
 

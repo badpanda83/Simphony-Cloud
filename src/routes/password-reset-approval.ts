@@ -25,7 +25,7 @@ function requireFeatureEnabled(): void {
   }
 }
 
-function runtimeBaseUrl(req: { protocol: string; get(name: string): string | undefined }): string {
+function resolveBaseUrl(req: { protocol: string; get(name: string): string | undefined }): string {
   return config.publicBaseUrl ?? `${req.protocol}://${req.get("host") ?? "localhost:3000"}`;
 }
 
@@ -67,7 +67,7 @@ passwordResetApprovalRouter.post(
 
     const result = await orchestrator.receiveInboundResetEmail(
       message,
-      runtimeBaseUrl(req)
+      resolveBaseUrl(req)
     );
     res.status(result.duplicate ? 200 : 202).json({
       ok: true,

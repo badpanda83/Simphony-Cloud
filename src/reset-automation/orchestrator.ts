@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { config } from "../config.js";
 import {
   createApprovalToken,
@@ -21,14 +20,14 @@ import type {
   ResetExecutionPipeline,
 } from "./types.js";
 
-function runtimeTokenSecret(): string {
-  return (
-    config.passwordResetApproval.approvalTokenSecret ??
-    randomBytes(32).toString("hex")
-  );
+function requireApprovalTokenSecret(): string {
+  if (!config.passwordResetApproval.approvalTokenSecret) {
+    throw new Error(
+      "PASSWORD_RESET_APPROVAL_TOKEN_SECRET is required when password reset approval workflow is enabled"
+    );
+  }
+  return config.passwordResetApproval.approvalTokenSecret;
 }
-
-const approvalTokenSecret = runtimeTokenSecret();
 
 export class PasswordResetApprovalOrchestrator {
   constructor(
@@ -65,15 +64,19 @@ export class PasswordResetApprovalOrchestrator {
     token: string,
     expectedAction: ApprovalDecision
   ): Promise<PublicResetApprovalRequest> {
+    const approvalTokenSecret = requireApprovalTokenSecret();
     const payload = verifyApprovalToken(
       token,
       approvalTokenSecret,
       expectedAction
     );
     consumeApprovalTokenId(payload.jti);
-    const resolved = expectedAction === "approve"
-      ? await this.approve(payload.sub)
-      : this.deny(payload.sub);
+    let resolved: ResetApprovalRequest;
+    if (expectedAction === "approve") {
+      resolved = await this.approve(payload.sub);
+    } else {
+      resolved = this.deny(payload.sub);
+    }
     return toPublicResetApprovalRequest(resolved);
   }
 
@@ -133,6 +136,7 @@ export class PasswordResetApprovalOrchestrator {
     baseUrl: string
   ): Promise<void> {
     const ttlSeconds = config.passwordResetApproval.approvalTokenTtlSeconds;
+    const approvalTokenSecret = requireApprovalTokenSecret();
     const approveToken = createApprovalToken(
       { requestId: request.id, action: "approve", ttlSeconds },
       approvalTokenSecret

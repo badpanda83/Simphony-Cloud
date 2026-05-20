@@ -10,7 +10,7 @@ function appendAudit(request, event, detail) {
 }
 export function consumeApprovalTokenId(jti) {
     if (consumedApprovalTokenIds.has(jti)) {
-        throw new Error("Approval token already used");
+        throw new Error(`Approval token already used: jti=${jti}`);
     }
     consumedApprovalTokenIds.add(jti);
 }

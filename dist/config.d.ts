@@ -26,7 +26,7 @@ export declare const config: {
         executionEnabled: boolean;
         defaultApprovalChannel: "email" | "slack";
         approvalEmailTo: string | undefined;
-        mailboxProvider: string;
+        mailboxProvider: "gmail";
         gmail: {
             inboxAddress: string | undefined;
             label: string;

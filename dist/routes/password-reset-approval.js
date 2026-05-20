@@ -12,7 +12,7 @@ function requireFeatureEnabled() {
         throw new Error("Password reset approval workflow is disabled. Set PASSWORD_RESET_APPROVAL_ENABLED=true to enable scaffolding endpoints.");
     }
 }
-function runtimeBaseUrl(req) {
+function resolveBaseUrl(req) {
     return config.publicBaseUrl ?? `${req.protocol}://${req.get("host") ?? "localhost:3000"}`;
 }
 export const passwordResetApprovalRouter = Router();
@@ -37,7 +37,7 @@ passwordResetApprovalRouter.post("/workflows/password-reset/inbound", asyncHandl
         receivedAt: String(receivedAt ?? new Date().toISOString()),
         resetLink: resetLink ? String(resetLink) : undefined,
     };
-    const result = await orchestrator.receiveInboundResetEmail(message, runtimeBaseUrl(req));
+    const result = await orchestrator.receiveInboundResetEmail(message, resolveBaseUrl(req));
     res.status(result.duplicate ? 200 : 202).json({
         ok: true,
         duplicate: result.duplicate,

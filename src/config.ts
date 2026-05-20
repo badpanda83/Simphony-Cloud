@@ -12,6 +12,10 @@ function optional(value: string | undefined): string | undefined {
   return trimmed || undefined;
 }
 
+function optionalWithDefault(value: string | undefined, fallback: string): string {
+  return optional(value) ?? fallback;
+}
+
 function optionalBoolean(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined) return fallback;
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
@@ -29,6 +33,15 @@ function optionalApprovalChannel(
 ): "email" | "slack" {
   const trimmed = value?.trim().toLowerCase();
   if (trimmed === "email" || trimmed === "slack") return trimmed;
+  return fallback;
+}
+
+function optionalMailboxProvider(
+  value: string | undefined,
+  fallback: "gmail"
+): "gmail" {
+  const trimmed = value?.trim().toLowerCase();
+  if (trimmed === "gmail") return "gmail";
   return fallback;
 }
 
@@ -71,11 +84,13 @@ export const config = {
       "email"
     ),
     approvalEmailTo: optional(process.env.PASSWORD_RESET_APPROVAL_EMAIL_TO),
-    mailboxProvider:
-      optional(process.env.PASSWORD_RESET_MAILBOX_PROVIDER) ?? "gmail",
+    mailboxProvider: optionalMailboxProvider(
+      process.env.PASSWORD_RESET_MAILBOX_PROVIDER,
+      "gmail"
+    ),
     gmail: {
       inboxAddress: optional(process.env.PASSWORD_RESET_GMAIL_INBOX_ADDRESS),
-      label: optional(process.env.PASSWORD_RESET_GMAIL_LABEL) ?? "INBOX",
+      label: optionalWithDefault(process.env.PASSWORD_RESET_GMAIL_LABEL, "INBOX"),
       pollIntervalMs: optionalNumber(
         process.env.PASSWORD_RESET_GMAIL_POLL_INTERVAL_MS,
         30000

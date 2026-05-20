@@ -1,12 +1,12 @@
-import { randomBytes } from "node:crypto";
 import { config } from "../config.js";
 import { createApprovalToken, verifyApprovalToken, } from "./approval-token.js";
 import { appendResetAuditEvent, consumeApprovalTokenId, createOrGetResetRequest, getResetRequest, toPublicResetApprovalRequest, updateResetRequest, } from "./store.js";
-function runtimeTokenSecret() {
-    return (config.passwordResetApproval.approvalTokenSecret ??
-        randomBytes(32).toString("hex"));
+function requireApprovalTokenSecret() {
+    if (!config.passwordResetApproval.approvalTokenSecret) {
+        throw new Error("PASSWORD_RESET_APPROVAL_TOKEN_SECRET is required when password reset approval workflow is enabled");
+    }
+    return config.passwordResetApproval.approvalTokenSecret;
 }
-const approvalTokenSecret = runtimeTokenSecret();
 export class PasswordResetApprovalOrchestrator {
     approvalProviders;
     executionPipeline;
@@ -32,11 +32,16 @@ export class PasswordResetApprovalOrchestrator {
         return toPublicResetApprovalRequest(request);
     }
     async resolveDecision(token, expectedAction) {
+        const approvalTokenSecret = requireApprovalTokenSecret();
         const payload = verifyApprovalToken(token, approvalTokenSecret, expectedAction);
         consumeApprovalTokenId(payload.jti);
-        const resolved = expectedAction === "approve"
-            ? await this.approve(payload.sub)
-            : this.deny(payload.sub);
+        let resolved;
+        if (expectedAction === "approve") {
+            resolved = await this.approve(payload.sub);
+        }
+        else {
+            resolved = this.deny(payload.sub);
+        }
         return toPublicResetApprovalRequest(resolved);
     }
     async approve(requestId) {
@@ -90,6 +95,7 @@ export class PasswordResetApprovalOrchestrator {
     }
     async sendApprovalRequest(request, baseUrl) {
         const ttlSeconds = config.passwordResetApproval.approvalTokenTtlSeconds;
+        const approvalTokenSecret = requireApprovalTokenSecret();
         const approveToken = createApprovalToken({ requestId: request.id, action: "approve", ttlSeconds }, approvalTokenSecret);
         const denyToken = createApprovalToken({ requestId: request.id, action: "deny", ttlSeconds }, approvalTokenSecret);
         const provider = this.approvalProviders[request.approvalChannel];

@@ -85,11 +85,8 @@ app.get("/", (_req, res) => {
 
 app.use(errorHandler);
 
-startPasswordResetAutomationScaffolding().catch((error) => {
-  console.error(
-    "[password-reset] failed to start inbox provider scaffolding:",
-    error
-  );
+startPasswordResetAutomationScaffolding().catch(() => {
+  console.warn("[password-reset] inbox provider scaffolding failed to initialize");
 });
 
 app.listen(config.port, () => {

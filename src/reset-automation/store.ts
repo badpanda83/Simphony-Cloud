@@ -19,7 +19,7 @@ function appendAudit(request: ResetApprovalRequest, event: string, detail?: stri
 
 export function consumeApprovalTokenId(jti: string): void {
   if (consumedApprovalTokenIds.has(jti)) {
-    throw new Error("Approval token already used");
+    throw new Error(`Approval token already used: jti=${jti}`);
   }
   consumedApprovalTokenIds.add(jti);
 }
