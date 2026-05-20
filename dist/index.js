@@ -15,6 +15,8 @@ import { notificationsRouter } from "./routes/notifications.js";
 import { webhooksRouter } from "./routes/webhooks.js";
 import { proxyRouter } from "./routes/proxy.js";
 import { validateRouter } from "./routes/validate.js";
+import { passwordResetApprovalRouter } from "./routes/password-reset-approval.js";
+import { startPasswordResetAutomationScaffolding } from "./reset-automation/runtime.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const docsDir = path.join(__dirname, "..", "docs");
 const app = express();
@@ -46,6 +48,7 @@ app.use(checksRouter);
 app.use(employeesRouter);
 app.use(notificationsRouter);
 app.use(proxyRouter);
+app.use(passwordResetApprovalRouter);
 app.get("/", (_req, res) => {
     res.json({
         name: "simphony-cloud",
@@ -62,10 +65,14 @@ app.get("/", (_req, res) => {
             notifications: "POST /workflows/notifications/setup",
             webhooks: "POST /webhooks/simphony",
             proxy: "GET /proxy/api/v1/organizations (prefix path after /proxy/)",
+            passwordReset: "POST /workflows/password-reset/inbound, GET /workflows/password-reset/approve|deny, GET /workflows/password-reset/status/:requestId",
         },
     });
 });
 app.use(errorHandler);
+startPasswordResetAutomationScaffolding().catch((error) => {
+    console.error("[password-reset] failed to start inbox provider scaffolding:", error);
+});
 app.listen(config.port, () => {
     console.info(`Simphony integration listening on port ${config.port}`);
 });

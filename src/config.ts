@@ -12,6 +12,26 @@ function optional(value: string | undefined): string | undefined {
   return trimmed || undefined;
 }
 
+function optionalBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
+function optionalNumber(value: string | undefined, fallback: number): number {
+  if (!value?.trim()) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function optionalApprovalChannel(
+  value: string | undefined,
+  fallback: "email" | "slack"
+): "email" | "slack" {
+  const trimmed = value?.trim().toLowerCase();
+  if (trimmed === "email" || trimmed === "slack") return trimmed;
+  return fallback;
+}
+
 export const config = {
   port: Number(process.env.PORT ?? 3000),
   nodeEnv: process.env.NODE_ENV ?? "development",
@@ -39,6 +59,38 @@ export const config = {
   },
 
   publicBaseUrl: optional(process.env.PUBLIC_BASE_URL),
+
+  passwordResetApproval: {
+    enabled: optionalBoolean(process.env.PASSWORD_RESET_APPROVAL_ENABLED, false),
+    executionEnabled: optionalBoolean(
+      process.env.PASSWORD_RESET_EXECUTION_ENABLED,
+      false
+    ),
+    defaultApprovalChannel: optionalApprovalChannel(
+      process.env.PASSWORD_RESET_DEFAULT_APPROVAL_CHANNEL,
+      "email"
+    ),
+    approvalEmailTo: optional(process.env.PASSWORD_RESET_APPROVAL_EMAIL_TO),
+    mailboxProvider:
+      optional(process.env.PASSWORD_RESET_MAILBOX_PROVIDER) ?? "gmail",
+    gmail: {
+      inboxAddress: optional(process.env.PASSWORD_RESET_GMAIL_INBOX_ADDRESS),
+      label: optional(process.env.PASSWORD_RESET_GMAIL_LABEL) ?? "INBOX",
+      pollIntervalMs: optionalNumber(
+        process.env.PASSWORD_RESET_GMAIL_POLL_INTERVAL_MS,
+        30000
+      ),
+    },
+    slack: {
+      botToken: optional(process.env.PASSWORD_RESET_SLACK_BOT_TOKEN),
+      channelId: optional(process.env.PASSWORD_RESET_SLACK_CHANNEL_ID),
+    },
+    approvalTokenSecret: optional(process.env.PASSWORD_RESET_APPROVAL_TOKEN_SECRET),
+    approvalTokenTtlSeconds: optionalNumber(
+      process.env.PASSWORD_RESET_APPROVAL_TOKEN_TTL_SECONDS,
+      900
+    ),
+  },
 };
 
 export function assertSimphonyHost(): string {
