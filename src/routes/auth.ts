@@ -4,6 +4,7 @@ import {
   authenticateFromEnv,
   exchangeToken,
   getCodeVerifier,
+  getSessionJar,
   signIn,
   startAuthorization,
 } from "../simphony/auth.js";
@@ -52,9 +53,11 @@ authRouter.post(
     }
 
     const codeVerifier = getCodeVerifier(authSessionId);
+    const jar = getSessionJar(authSessionId);
     const tokens = await exchangeToken("authorization_code", {
       code: authCode,
       codeVerifier,
+      jar,
     });
     res.json({
       ok: true,

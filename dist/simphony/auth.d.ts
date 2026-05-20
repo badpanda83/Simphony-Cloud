@@ -21,6 +21,8 @@ export declare function signIn(input: SignInInput): Promise<{
     authCode: string;
 }>;
 export declare function getCodeVerifier(authSessionId: string): string;
+/** Return the cookie jar for an active auth session (for token exchange). */
+export declare function getSessionJar(authSessionId: string): Map<string, string> | undefined;
 export declare function exchangeToken(grantType: "authorization_code" | "refresh_token", params: {
     code?: string;
     codeVerifier?: string;
@@ -28,6 +30,8 @@ export declare function exchangeToken(grantType: "authorization_code" | "refresh
     host?: string;
     clientId?: string;
     persist?: boolean;
+    /** Cookie jar from the authorize/signin session – required for session continuity. */
+    jar?: Map<string, string>;
 }): Promise<TokenSet>;
 export declare function ensureIdToken(): Promise<string>;
 /** Convenience: full auth using env credentials (for Postman / automation). */

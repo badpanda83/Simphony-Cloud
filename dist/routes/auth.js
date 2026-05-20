@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../middleware/async.js";
-import { authenticateFromEnv, exchangeToken, getCodeVerifier, signIn, startAuthorization, } from "../simphony/auth.js";
+import { authenticateFromEnv, exchangeToken, getCodeVerifier, getSessionJar, signIn, startAuthorization, } from "../simphony/auth.js";
 import { getTokens, setTokens } from "../simphony/token-store.js";
 import { config } from "../config.js";
 export const authRouter = Router();
@@ -31,9 +31,11 @@ authRouter.post("/auth/token", asyncHandler(async (req, res) => {
         return;
     }
     const codeVerifier = getCodeVerifier(authSessionId);
+    const jar = getSessionJar(authSessionId);
     const tokens = await exchangeToken("authorization_code", {
         code: authCode,
         codeVerifier,
+        jar,
     });
     res.json({
         ok: true,
