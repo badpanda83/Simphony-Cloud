@@ -83,6 +83,21 @@ input {
   font-size: 0.8rem;
 }
 
+.hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.helper-btn {
+  margin-top: 0.45rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
 .row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

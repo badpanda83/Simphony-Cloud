@@ -39,13 +39,22 @@
             type="url"
             id="simphonyHost"
             name="simphonyHost"
-            placeholder="https://your-tenant.example.com"
+            placeholder="https://ors-idm.us07.oraclerestaurants.com"
             required
           />
+          <span class="hint">Use the Oracle auth host only (no trailing slash).</span>
         </label>
         <label>
           Client ID
           <input type="text" id="clientId" name="clientId" required />
+          <span class="hint"
+            >Oracle may provide an encoded value. If auth fails, the decoded format often
+            looks like <code>ORG.UUID</code>.</span
+          >
+          <span id="clientIdSuggestion" class="hint hidden"></span>
+          <button type="button" id="useDecodedClientId" class="helper-btn hidden">
+            Use decoded Client ID
+          </button>
         </label>
         <label>
           API username
@@ -64,6 +73,7 @@
         <label>
           Organization name (sign-in)
           <input type="text" id="orgName" name="orgName" required />
+          <span class="hint">Used for Oracle sign-in on the auth step (often your tenant name).</span>
         </label>
 
         <h2>Location</h2>
@@ -71,6 +81,7 @@
           <label>
             Org short name
             <input type="text" id="orgShortName" name="orgShortName" required />
+            <span class="hint">Used in Simphony API headers after sign-in; may match org name.</span>
           </label>
           <label>
             Location ref
